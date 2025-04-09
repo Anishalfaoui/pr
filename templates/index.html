@@ -1,51 +1,65 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Chat</title>
+    <title>Chat Sécurisé</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="app-container">
         <header class="app-header">
-            <h1>Secure Chat App</h1>
-            <p id="local-port-info">Loading local port info...</p>
+            <h1>Application de Chat Sécurisé</h1>
+            <p id="local-port-info">Chargement des informations du port local...</p>
             <div class="nickname-container">
-                <label for="nickname">Your Nickname:</label>
-                <input type="text" id="nickname" placeholder="Enter your nickname">
-                <button id="save-nickname">Save</button>
+                <label for="nickname">Votre Pseudo:</label>
+                <input type="text" id="nickname" placeholder="Entrez votre pseudo">
+                <button id="save-nickname">Enregistrer</button>
             </div>
         </header>
 
         <div id="error-banner" class="error-banner" style="display: none;"></div>
 
         <div class="connection-panel">
-            <form id="connection-form">
-                <div class="form-group">
-                    <label for="destIp">Destination IP:</label>
-                    <input id="destIp" type="text" placeholder="192.168.1.x" required>
+            <div class="discovered-peers-container">
+                <h3>Pairs Découverts</h3>
+                <div class="peer-selection">
+                    <select id="discovered-peers">
+                        <option value="">Sélectionner un pair découvert</option>
+                    </select>
+                    <button id="connect-to-peer-btn">Connecter</button>
                 </div>
-                <div class="form-group">
-                    <label for="destPort">Destination Port:</label>
-                    <input id="destPort" type="number" placeholder="12345" required>
-                </div>
-                <button type="submit">Connect</button>
-            </form>
+                <p class="discovery-info">Les pairs sont automatiquement découverts et mis à jour toutes les 5 secondes</p>
+            </div>
+            
+            <div class="manual-connection">
+                <h3>Connexion Manuelle</h3>
+                <form id="connection-form">
+                    <div class="form-group">
+                        <label for="destIp">IP de Destination:</label>
+                        <input id="destIp" type="text" placeholder="192.168.1.x" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="destPort">Port de Destination:</label>
+                        <input id="destPort" type="number" placeholder="12345" required>
+                    </div>
+                    <button type="submit">Connecter</button>
+                </form>
+            </div>
             
             <div class="saved-connections">
-                <h3>Saved Connections</h3>
+                <h3>Connexions Sauvegardées</h3>
                 <select id="saved-connections-list">
-                    <option value="">Select a saved connection</option>
+                    <option value="">Sélectionner une connexion sauvegardée</option>
                 </select>
-                <button id="load-connection">Load</button>
-                <button id="delete-connection">Delete</button>
+                <button id="load-connection">Charger</button>
+                <button id="delete-connection">Supprimer</button>
             </div>
         </div>
 
         <div class="chat-container">
             <div class="chat-header">
-                <span id="current-peer">Not connected</span>
+                <span id="current-peer">Non connecté</span>
             </div>
             
             <div id="messages-container" class="messages-container">
@@ -53,8 +67,8 @@
             </div>
 
             <form id="message-form" class="message-form">
-                <input type="text" id="message-input" placeholder="Type your message..." disabled>
-                <button type="submit" id="send-button" disabled>Send</button>
+                <input type="text" id="message-input" placeholder="Tapez votre message..." disabled>
+                <button type="submit" id="send-button" disabled>Envoyer</button>
             </form>
         </div>
     </div>

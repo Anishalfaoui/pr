@@ -60,10 +60,40 @@ body {
     margin-bottom: 15px;
 }
 
+.discovered-peers-container {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.peer-selection {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.peer-selection select {
+    flex-grow: 1;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.discovery-info {
+    font-size: 0.8em;
+    color: #666;
+    margin-top: 5px;
+}
+
+.manual-connection {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
 .saved-connections {
     margin-top: 15px;
-    padding-top: 15px;
-    border-top: 1px solid #eee;
 }
 
 .saved-connections h3 {

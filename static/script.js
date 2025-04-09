@@ -15,10 +15,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadConnectionBtn = document.getElementById('load-connection');
     const deleteConnectionBtn = document.getElementById('delete-connection');
     const currentPeerElement = document.getElementById('current-peer');
+    const peersDropdown = document.getElementById('discovered-peers');
+    const connectToPeerBtn = document.getElementById('connect-to-peer-btn');
     
     // Connection state
     let isConnected = false;
     let currentPeer = null;
+    let discoveredPeers = {};
     
     // Initialize Socket.IO
     const socket = io();
@@ -27,6 +30,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const savedNickname = localStorage.getItem('nickname');
     if (savedNickname) {
         nicknameInput.value = savedNickname;
+        // Send nickname to server
+        updateNicknameOnServer(savedNickname);
     }
     
     // Load saved connections
@@ -36,7 +41,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fetch('/config')
         .then(response => response.json())
         .then(data => {
-            localPortInfo.textContent = `Your local UDP port: ${data.local_port}`;
+            localPortInfo.textContent = `Votre port UDP local: ${data.local_port}`;
             
             if (data.dest_ip && data.dest_port) {
                 destIpInput.value = data.dest_ip;
@@ -45,14 +50,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Set current peer
                 currentPeer = `${data.dest_ip}:${data.dest_port}`;
-                currentPeerElement.textContent = `Connected to: ${currentPeer}`;
+                currentPeerElement.textContent = `Connecté à: ${currentPeer}`;
                 
                 // Load conversation history for this peer
                 loadConversationHistory(currentPeer);
             }
         })
         .catch(error => {
-            showError("Failed to load configuration");
+            showError("Échec du chargement de la configuration");
             console.error('Error:', error);
         });
     
@@ -61,9 +66,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const nickname = nicknameInput.value.trim();
         if (nickname) {
             localStorage.setItem('nickname', nickname);
-            showSuccess(`Nickname saved: ${nickname}`);
+            updateNicknameOnServer(nickname);
+            showSuccess(`Pseudo enregistré: ${nickname}`);
         } else {
-            showError("Please enter a valid nickname");
+            showError("Veuillez entrer un pseudo valide");
+        }
+    });
+    
+    // Connect to discovered peer
+    connectToPeerBtn.addEventListener('click', function() {
+        const selectedPeerId = peersDropdown.value;
+        if (selectedPeerId && discoveredPeers[selectedPeerId]) {
+            const peer = discoveredPeers[selectedPeerId];
+            destIpInput.value = peer.ip;
+            destPortInput.value = peer.port;
+            connectToPeer(peer.ip, peer.port);
+        } else {
+            showError("Veuillez sélectionner un pair pour vous connecter");
         }
     });
     
@@ -73,7 +92,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     socket.on('connection_status', (data) => {
-        localPortInfo.textContent = `Your local UDP port: ${data.local_port}`;
+        localPortInfo.textContent = `Votre port UDP local: ${data.local_port}`;
+    });
+    
+    socket.on('peers_updated', (data) => {
+        discoveredPeers = data.peers;
+        updatePeersDropdown();
     });
     
     socket.on('receive_message', (data) => {
@@ -125,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const destPort = destPortInput.value.trim();
         
         if (!destIp || !destPort) {
-            showError('Please enter destination IP and port');
+            showError('Veuillez entrer l\'IP et le port de destination');
             return;
         }
         
@@ -171,11 +195,54 @@ document.addEventListener('DOMContentLoaded', function() {
             // Reload the dropdown
             loadSavedConnections();
             
-            showSuccess(`Deleted connection: ${selectedOption.value}`);
+            showSuccess(`Connexion supprimée: ${selectedOption.value}`);
         }
     });
     
     // Helper functions
+    function updatePeersDropdown() {
+        // Clear the dropdown
+        while (peersDropdown.options.length > 0) {
+            peersDropdown.remove(0);
+        }
+        
+        // Add default option
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = 'Sélectionner un pair découvert';
+        peersDropdown.appendChild(defaultOption);
+        
+        // Add discovered peers
+        Object.keys(discoveredPeers).forEach(peerId => {
+            const peer = discoveredPeers[peerId];
+            const option = document.createElement('option');
+            option.value = peerId;
+            option.textContent = `${peer.nickname} (${peerId})`;
+            peersDropdown.appendChild(option);
+        });
+    }
+    
+    function updateNicknameOnServer(nickname) {
+        fetch('/set_nickname', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                nickname: nickname
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log(`Pseudo défini: ${data.nickname}`);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur lors de la définition du pseudo:', error);
+        });
+    }
+    
     function connectToPeer(ip, port) {
         fetch('/connect', {
             method: 'POST',
@@ -191,11 +258,17 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 enableChat();
-                showSuccess(`Connected to ${ip}:${port}`);
+                showSuccess(`Connecté à ${ip}:${port}`);
                 
                 // Set current peer
                 currentPeer = `${ip}:${port}`;
-                currentPeerElement.textContent = `Connected to: ${currentPeer}`;
+                currentPeerElement.textContent = `Connecté à: ${currentPeer}`;
+                
+                // Find nickname if it's a discovered peer
+                if (discoveredPeers[currentPeer]) {
+                    const peerNickname = discoveredPeers[currentPeer].nickname;
+                    currentPeerElement.textContent = `Connecté à: ${peerNickname} (${currentPeer})`;
+                }
                 
                 // Save this connection
                 saveConnection(ip, port);
@@ -203,11 +276,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Load conversation history
                 loadConversationHistory(currentPeer);
             } else {
-                showError(data.message || 'Failed to connect');
+                showError(data.message || 'Échec de la connexion');
             }
         })
         .catch(error => {
-            showError('Failed to connect');
+            showError('Échec de la connexion');
             console.error('Error:', error);
         });
     }
@@ -252,12 +325,20 @@ document.addEventListener('DOMContentLoaded', function() {
         if (messageObj.sender && messageObj.type === 'received') {
             const senderDiv = document.createElement('div');
             senderDiv.className = 'message-sender';
-            senderDiv.textContent = messageObj.sender;
+            
+            // Try to find peer nickname if it's from a discovered peer
+            let displayName = messageObj.sender;
+            const peerId = messageObj.sender;
+            if (discoveredPeers[peerId]) {
+                displayName = `${discoveredPeers[peerId].nickname} (${peerId})`;
+            }
+            
+            senderDiv.textContent = displayName;
             messageDiv.appendChild(senderDiv);
         } else if (messageObj.sender && messageObj.type === 'sent') {
             const senderDiv = document.createElement('div');
             senderDiv.className = 'message-sender';
-            senderDiv.textContent = 'You';
+            senderDiv.textContent = 'Vous';
             messageDiv.appendChild(senderDiv);
         }
         

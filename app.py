@@ -3,7 +3,8 @@ import socket
 import select
 import threading
 import time
-from flask import Flask, request, jsonify, render_template, send_from_directory
+import sys
+from flask import Flask, request, jsonify, render_template
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from Crypto.Cipher import AES
@@ -17,9 +18,10 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # AES encryption parameters
 KEY = b"thisisaverysecretkey123N"  # 24 bytes
 
-# UDP socket setup
+# UDP socket setup - keeping original architecture
 udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 udp_socket.bind(('0.0.0.0', 0))  # Use any available port
+udp_socket.setblocking(False)  # Non-blocking mode as in original code
 local_port = udp_socket.getsockname()[1]
 
 # Store destination information
@@ -28,40 +30,42 @@ dest_info = {
     'port': None
 }
 
+# Initialize epoll for UDP socket - keeping original architecture
+epoll = select.epoll()
+epoll.register(udp_socket.fileno(), select.EPOLLIN)  # Listen for messages
+
 def chiffrer(message):
-    """Encrypts a message with AES in CBC mode."""
-    IV = os.urandom(16)
+    """Chiffre un message avec AES en mode CBC."""
+    IV = os.urandom(16)  # Random IV generation as in original
     cipher = AES.new(KEY, AES.MODE_CBC, IV)
     return IV + cipher.encrypt(pad(message.encode(), AES.block_size))
 
 def dechiffrer(data):
-    """Decrypts an AES CBC message."""
-    iv = data[:16]
+    """Déchiffre un message AES CBC."""
+    iv = data[:16]  # Extract IV
     cipher = AES.new(KEY, AES.MODE_CBC, iv)
     return unpad(cipher.decrypt(data[16:]), AES.block_size).decode()
 
 def udp_listener():
-    """Thread function to listen for UDP messages"""
+    """Thread function to monitor UDP socket using epoll"""
     while True:
         try:
-            # Set a timeout to avoid blocking indefinitely
-            udp_socket.settimeout(1)
-            data, addr = udp_socket.recvfrom(1024)
+            events = epoll.poll(timeout=1)  # Use timeout to avoid blocking indefinitely
             
-            try:
-                message = dechiffrer(data)
-                # Send the message to all connected clients via WebSocket
-                socketio.emit('receive_message', {
-                    'sender': f"{addr[0]}:{addr[1]}",
-                    'message': message,
-                    'timestamp': time.time()
-                })
-            except Exception as e:
-                print(f"Error decrypting message: {e}")
-                socketio.emit('error', {'message': 'Failed to decrypt incoming message'})
-        except socket.timeout:
-            # This is expected, just continue the loop
-            pass
+            for fileno, event in events:
+                if fileno == udp_socket.fileno():  # Message received
+                    data, addr = udp_socket.recvfrom(1024)
+                    try:
+                        message = dechiffrer(data)
+                        # Send the message to all connected clients via WebSocket
+                        socketio.emit('receive_message', {
+                            'sender': f"{addr[0]}:{addr[1]}",
+                            'message': message,
+                            'timestamp': time.time()
+                        })
+                    except Exception as e:
+                        print(f"\n[Erreur] Impossible de déchiffrer le message: {e}")
+                        socketio.emit('error', {'message': 'Failed to decrypt incoming message'})
         except Exception as e:
             print(f"Error in UDP listener: {e}")
             time.sleep(1)  # Avoid CPU spinning on persistent errors

@@ -22,6 +22,21 @@ body {
     margin-bottom: 20px;
 }
 
+.nickname-container {
+    margin-top: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.nickname-container input {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    width: 200px;
+}
+
 .error-banner {
     background-color: #ffdddd;
     color: #ff0000;
@@ -42,6 +57,26 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
+    margin-bottom: 15px;
+}
+
+.saved-connections {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.saved-connections h3 {
+    margin-top: 0;
+    font-size: 1rem;
+}
+
+.saved-connections select {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-right: 10px;
+    width: 60%;
 }
 
 .form-group {
@@ -67,10 +102,10 @@ button {
     background-color: #4CAF50;
     color: white;
     border: none;
-    padding: 10px 15px;
+    padding: 8px 15px;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 14px;
 }
 
 button:hover {
@@ -86,6 +121,13 @@ button:disabled {
     border: 1px solid #ddd;
     border-radius: 5px;
     overflow: hidden;
+}
+
+.chat-header {
+    padding: 10px;
+    background-color: #f1f1f1;
+    border-bottom: 1px solid #ddd;
+    font-weight: bold;
 }
 
 .messages-container {

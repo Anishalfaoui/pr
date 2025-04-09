@@ -11,6 +11,11 @@
         <header class="app-header">
             <h1>Secure Chat App</h1>
             <p id="local-port-info">Loading local port info...</p>
+            <div class="nickname-container">
+                <label for="nickname">Your Nickname:</label>
+                <input type="text" id="nickname" placeholder="Enter your nickname">
+                <button id="save-nickname">Save</button>
+            </div>
         </header>
 
         <div id="error-banner" class="error-banner" style="display: none;"></div>
@@ -27,9 +32,22 @@
                 </div>
                 <button type="submit">Connect</button>
             </form>
+            
+            <div class="saved-connections">
+                <h3>Saved Connections</h3>
+                <select id="saved-connections-list">
+                    <option value="">Select a saved connection</option>
+                </select>
+                <button id="load-connection">Load</button>
+                <button id="delete-connection">Delete</button>
+            </div>
         </div>
 
         <div class="chat-container">
+            <div class="chat-header">
+                <span id="current-peer">Not connected</span>
+            </div>
+            
             <div id="messages-container" class="messages-container">
                 <!-- Messages will be inserted here -->
             </div>

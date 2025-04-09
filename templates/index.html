@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Chat</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>Secure Chat App</h1>
+            <p id="local-port-info">Loading local port info...</p>
+        </header>
+
+        <div id="error-banner" class="error-banner" style="display: none;"></div>
+
+        <div class="connection-panel">
+            <form id="connection-form">
+                <div class="form-group">
+                    <label for="destIp">Destination IP:</label>
+                    <input id="destIp" type="text" placeholder="192.168.1.x" required>
+                </div>
+                <div class="form-group">
+                    <label for="destPort">Destination Port:</label>
+                    <input id="destPort" type="number" placeholder="12345" required>
+                </div>
+                <button type="submit">Connect</button>
+            </form>
+        </div>
+
+        <div class="chat-container">
+            <div id="messages-container" class="messages-container">
+                <!-- Messages will be inserted here -->
+            </div>
+
+            <form id="message-form" class="message-form">
+                <input type="text" id="message-input" placeholder="Type your message..." disabled>
+                <button type="submit" id="send-button" disabled>Send</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Include Socket.IO client -->
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+    <script src="/static/script.js"></script>
+</body>
+</html>

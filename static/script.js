@@ -392,18 +392,41 @@ document.addEventListener('DOMContentLoaded', function() {
         const messageElement = document.createElement('div');
         messageElement.className = `message ${messageObj.type}`;
         
+        // Create and style sender/username element
         const senderElement = document.createElement('div');
         senderElement.className = 'sender';
         senderElement.textContent = messageObj.sender;
         
+        // Create message content element
         const contentElement = document.createElement('div');
         contentElement.className = 'content';
         contentElement.textContent = messageObj.content;
         
+        // Create and style timestamp with formatted date
         const timeElement = document.createElement('div');
         timeElement.className = 'timestamp';
-        timeElement.textContent = new Date(messageObj.timestamp).toLocaleTimeString();
         
+        // Format the timestamp nicely
+        const messageDate = new Date(messageObj.timestamp);
+        const now = new Date();
+        const isToday = messageDate.toDateString() === now.toDateString();
+        
+        // Format time as HH:MM
+        const hours = messageDate.getHours().toString().padStart(2, '0');
+        const minutes = messageDate.getMinutes().toString().padStart(2, '0');
+        const timeString = `${hours}:${minutes}`;
+        
+        // Add date if not today
+        if (isToday) {
+            timeElement.textContent = `Today at ${timeString}`;
+        } else {
+            // Format: Apr 10 at 22:20
+            const month = messageDate.toLocaleString('en-US', { month: 'short' });
+            const day = messageDate.getDate();
+            timeElement.textContent = `${month} ${day} at ${timeString}`;
+        }
+        
+        // Append all elements to the message container
         messageElement.appendChild(senderElement);
         messageElement.appendChild(contentElement);
         messageElement.appendChild(timeElement);

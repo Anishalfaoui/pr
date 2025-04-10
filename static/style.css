@@ -213,3 +213,58 @@ button:disabled {
     border-radius: 4px;
     margin-right: 10px;
 }
+
+
+/* Style pour les entrées d'IP et port invalides */
+.input-error {
+    border: 2px solid #ff4444;
+    background-color: #ffeeee;
+}
+
+/* Styles pour les différents types de notifications */
+#error-banner {
+    padding: 10px 15px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    font-weight: bold;
+    transition: background-color 0.3s ease;
+}
+
+/* Ces styles sont déjà appelés par les fonctions dans script.js */
+/* Pour les erreurs (fond rouge clair) */
+#error-banner.error {
+    background-color: #ffdddd;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Pour les avertissements (fond jaune clair) */
+#error-banner.warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+/* Pour les succès (fond vert clair) */
+#error-banner.success {
+    background-color: #ddffdd;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+/* Style pour la liste déroulante des IP améliorée */
+#active-ips {
+    max-width: 100%;
+    width: 100%;
+    padding: 8px;
+    font-size: 14px;
+}
+
+#active-ips optgroup {
+    font-weight: bold;
+    color: #333;
+}
+
+#active-ips option {
+    padding: 5px;
+}

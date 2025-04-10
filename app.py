@@ -86,6 +86,10 @@ def udp_listener():
                         # Try to parse as JSON
                         try:
                             message_data = json.loads(message)
+                            # Si c'est un message de test, ne pas l'afficher à l'utilisateur
+                            if message_data.get('test', False):
+                                continue
+                                
                             content = message_data.get('content', message)  # Fallback to using the entire message
                             socketio.emit('receive_message', {
                                 'sender': f"{addr[0]}:{addr[1]}",
@@ -171,6 +175,20 @@ def scan_network():
         # Sleep before next scan
         time.sleep(15)  # Scan every 15 seconds
 
+def check_connection_status():
+    """Thread function to periodically check if destination is reachable"""
+    global dest_info
+    
+    while True:
+        if dest_info['ip'] and dest_info['port']:
+            if not ping_host(dest_info['ip']):
+                socketio.emit('connection_warning', {
+                    'message': f"Attention: L'hôte {dest_info['ip']} semble inaccessible."
+                })
+        
+        # Vérifier toutes les 30 secondes
+        time.sleep(30)
+
 # Start the UDP listener thread
 udp_thread = threading.Thread(target=udp_listener, daemon=True)
 udp_thread.start()
@@ -178,6 +196,10 @@ udp_thread.start()
 # Start the network scanning thread
 scan_thread = threading.Thread(target=scan_network, daemon=True)
 scan_thread.start()
+
+# Démarrer le thread de surveillance de connexion
+conn_check_thread = threading.Thread(target=check_connection_status, daemon=True)
+conn_check_thread.start()
 
 @app.route('/')
 def index():
@@ -203,9 +225,41 @@ def get_active_ips():
 def set_destination():
     """Set the destination IP and port"""
     data = request.json
-    dest_info['ip'] = data.get('ip')
-    dest_info['port'] = int(data.get('port'))
-    return jsonify({'success': True, 'message': f"Connected to {dest_info['ip']}:{dest_info['port']}"})
+    ip = data.get('ip')
+    port = data.get('port')
+    
+    # Validation de l'adresse IP
+    try:
+        socket.inet_aton(ip)  # Vérifie que l'IP est au format correct
+    except socket.error:
+        return jsonify({'success': False, 'message': 'Adresse IP invalide'})
+    
+    # Validation du port
+    if not isinstance(port, int) or port < 1 or port > 65535:
+        return jsonify({'success': False, 'message': 'Port invalide. Doit être un nombre entre 1 et 65535'})
+    
+    # Test de connectivité
+    if not ping_host(ip):
+        return jsonify({'success': False, 'message': f"Impossible de joindre l'hôte {ip}. Vérifiez que l'appareil est connecté au réseau."})
+    
+    # Essayer d'envoyer un message de test
+    test_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    test_socket.settimeout(2)  # Timeout de 2 secondes
+    
+    try:
+        # Essayer d'envoyer un message de test
+        test_message = chiffrer(json.dumps({"test": True, "sender": local_nickname}))
+        test_socket.sendto(test_message, (ip, port))
+        
+    except socket.error as e:
+        test_socket.close()
+        return jsonify({'success': False, 'message': f"Erreur de connexion: {str(e)}"})
+        
+    test_socket.close()
+    
+    dest_info['ip'] = ip
+    dest_info['port'] = port
+    return jsonify({'success': True, 'message': f"Connecté à {dest_info['ip']}:{dest_info['port']}"})
 
 @app.route('/set_nickname', methods=['POST'])
 def set_nickname():
@@ -225,7 +279,7 @@ def handle_connect():
 def handle_message(data):
     """Handle sending a message via UDP"""
     if not dest_info['ip'] or not dest_info['port']:
-        emit('error', {'message': 'Destination not set'})
+        emit('error', {'message': 'Destination non configurée'})
         return
 
     message = data.get('message', '')
@@ -238,11 +292,32 @@ def handle_message(data):
         }
         message_json = json.dumps(message_data)
         encrypted_data = chiffrer(message_json)
-        udp_socket.sendto(encrypted_data, (dest_info['ip'], dest_info['port']))
-        emit('message_sent', {'success': True, 'message': message, 'timestamp': time.time()})
+        
+        # Essayer d'envoyer le message avec un timeout
+        try:
+            # Vérifier d'abord si l'hôte est joignable
+            if not ping_host(dest_info['ip']):
+                emit('error', {'message': f"IP ou port invalide : L'hôte {dest_info['ip']} est inaccessible. Le message n'a pas été envoyé."})
+                return
+                
+            # Créer un socket temporaire avec timeout pour l'envoi
+            temp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            temp_socket.settimeout(2)  # 2 secondes de timeout
+            
+            temp_socket.sendto(encrypted_data, (dest_info['ip'], dest_info['port']))
+            temp_socket.close()
+            
+            # Le message a été envoyé avec succès (du moins, pas d'erreur détectée)
+            emit('message_sent', {'success': True, 'message': message, 'timestamp': time.time()})
+                
+        except socket.timeout:
+            emit('error', {'message': f"IP ou port invalide : Délai d'attente dépassé lors de l'envoi du message."})
+        except socket.error as e:
+            emit('error', {'message': f"IP ou port invalide : {str(e)}"})
+            
     except Exception as e:
         print(f"Error sending message: {e}")
-        emit('error', {'message': f'Failed to send message: {str(e)}'})
+        emit('error', {'message': f'Échec de l\'envoi du message: {str(e)}'})
 
 if __name__ == '__main__':
     print(f"Starting server. Local UDP port: {local_port}")

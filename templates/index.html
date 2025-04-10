@@ -21,19 +21,19 @@
         <div id="error-banner" class="error-banner" style="display: none;"></div>
 
         <div class="connection-panel">
-            <div class="discovered-peers-container">
-                <h3>Pairs Découverts</h3>
-                <div class="peer-selection">
-                    <select id="discovered-peers">
-                        <option value="">Sélectionner un pair découvert</option>
+            <div class="active-ips-container">
+                <h3>Adresses IP Actives</h3>
+                <div class="ip-selection">
+                    <select id="active-ips">
+                        <option value="">Sélectionner une adresse IP active</option>
                     </select>
-                    <button id="connect-to-peer-btn">Connecter</button>
+                    <button id="select-ip-btn">Sélectionner</button>
                 </div>
-                <p class="discovery-info">Les pairs sont automatiquement découverts et mis à jour toutes les 5 secondes</p>
+                <p class="discovery-info">Les adresses IP sont automatiquement détectées et mises à jour toutes les 15 secondes</p>
             </div>
             
             <div class="manual-connection">
-                <h3>Connexion Manuelle</h3>
+                <h3>Connexion</h3>
                 <form id="connection-form">
                     <div class="form-group">
                         <label for="destIp">IP de Destination:</label>

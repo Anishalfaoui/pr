@@ -15,13 +15,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const loadConnectionBtn = document.getElementById('load-connection');
     const deleteConnectionBtn = document.getElementById('delete-connection');
     const currentPeerElement = document.getElementById('current-peer');
-    const peersDropdown = document.getElementById('discovered-peers');
-    const connectToPeerBtn = document.getElementById('connect-to-peer-btn');
+    const activeIpsDropdown = document.getElementById('active-ips');
+    const selectIpBtn = document.getElementById('select-ip-btn');
     
     // Connection state
     let isConnected = false;
     let currentPeer = null;
-    let discoveredPeers = {};
+    let discoveredIps = {};
     
     // Initialize Socket.IO
     const socket = io();
@@ -61,6 +61,9 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error:', error);
         });
     
+    // Initial load of active IPs
+    loadActiveIps();
+    
     // Save nickname
     saveNicknameBtn.addEventListener('click', function() {
         const nickname = nicknameInput.value.trim();
@@ -73,16 +76,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Connect to discovered peer
-    connectToPeerBtn.addEventListener('click', function() {
-        const selectedPeerId = peersDropdown.value;
-        if (selectedPeerId && discoveredPeers[selectedPeerId]) {
-            const peer = discoveredPeers[selectedPeerId];
-            destIpInput.value = peer.ip;
-            destPortInput.value = peer.port;
-            connectToPeer(peer.ip, peer.port);
+    // Select IP from dropdown
+    selectIpBtn.addEventListener('click', function() {
+        const selectedIp = activeIpsDropdown.value;
+        if (selectedIp) {
+            destIpInput.value = selectedIp;
+            // Focus on port input for user to enter
+            destPortInput.focus();
+            showSuccess(`IP sélectionnée: ${selectedIp}. Veuillez entrer le port.`);
         } else {
-            showError("Veuillez sélectionner un pair pour vous connecter");
+            showError("Veuillez sélectionner une adresse IP");
         }
     });
     
@@ -95,9 +98,9 @@ document.addEventListener('DOMContentLoaded', function() {
         localPortInfo.textContent = `Votre port UDP local: ${data.local_port}`;
     });
     
-    socket.on('peers_updated', (data) => {
-        discoveredPeers = data.peers;
-        updatePeersDropdown();
+    socket.on('ips_updated', (data) => {
+        discoveredIps = data.ips;
+        updateIpsDropdown();
     });
     
     socket.on('receive_message', (data) => {
@@ -200,25 +203,37 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Helper functions
-    function updatePeersDropdown() {
+    function loadActiveIps() {
+        fetch('/active_ips')
+            .then(response => response.json())
+            .then(data => {
+                discoveredIps = data.ips;
+                updateIpsDropdown();
+            })
+            .catch(error => {
+                console.error('Error loading active IPs:', error);
+            });
+    }
+    
+    function updateIpsDropdown() {
         // Clear the dropdown
-        while (peersDropdown.options.length > 0) {
-            peersDropdown.remove(0);
+        while (activeIpsDropdown.options.length > 0) {
+            activeIpsDropdown.remove(0);
         }
         
         // Add default option
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
-        defaultOption.textContent = 'Sélectionner un pair découvert';
-        peersDropdown.appendChild(defaultOption);
+        defaultOption.textContent = 'Sélectionner une adresse IP active';
+        activeIpsDropdown.appendChild(defaultOption);
         
-        // Add discovered peers
-        Object.keys(discoveredPeers).forEach(peerId => {
-            const peer = discoveredPeers[peerId];
+        // Add discovered IPs
+        Object.keys(discoveredIps).forEach(ip => {
+            const ipInfo = discoveredIps[ip];
             const option = document.createElement('option');
-            option.value = peerId;
-            option.textContent = `${peer.nickname} (${peerId})`;
-            peersDropdown.appendChild(option);
+            option.value = ip;
+            option.textContent = `${ip} (${ipInfo.hostname})`;
+            activeIpsDropdown.appendChild(option);
         });
     }
     
@@ -262,13 +277,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Set current peer
                 currentPeer = `${ip}:${port}`;
-                currentPeerElement.textContent = `Connecté à: ${currentPeer}`;
                 
-                // Find nickname if it's a discovered peer
-                if (discoveredPeers[currentPeer]) {
-                    const peerNickname = discoveredPeers[currentPeer].nickname;
-                    currentPeerElement.textContent = `Connecté à: ${peerNickname} (${currentPeer})`;
+                // Set hostname if available
+                let displayName = currentPeer;
+                if (discoveredIps[ip] && discoveredIps[ip].hostname !== "Unknown") {
+                    displayName = `${discoveredIps[ip].hostname} (${currentPeer})`;
                 }
+                currentPeerElement.textContent = `Connecté à: ${displayName}`;
                 
                 // Save this connection
                 saveConnection(ip, port);
@@ -325,15 +340,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (messageObj.sender && messageObj.type === 'received') {
             const senderDiv = document.createElement('div');
             senderDiv.className = 'message-sender';
-            
-            // Try to find peer nickname if it's from a discovered peer
-            let displayName = messageObj.sender;
-            const peerId = messageObj.sender;
-            if (discoveredPeers[peerId]) {
-                displayName = `${discoveredPeers[peerId].nickname} (${peerId})`;
-            }
-            
-            senderDiv.textContent = displayName;
+            senderDiv.textContent = messageObj.sender;
             messageDiv.appendChild(senderDiv);
         } else if (messageObj.sender && messageObj.type === 'sent') {
             const senderDiv = document.createElement('div');

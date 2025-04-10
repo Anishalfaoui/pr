@@ -60,20 +60,20 @@ body {
     margin-bottom: 15px;
 }
 
-.discovered-peers-container {
+.active-ips-container {
     margin-bottom: 20px;
     padding-bottom: 15px;
     border-bottom: 1px solid #eee;
 }
 
-.peer-selection {
+.ip-selection {
     display: flex;
     align-items: center;
     gap: 10px;
     margin-bottom: 10px;
 }
 
-.peer-selection select {
+.ip-selection select {
     flex-grow: 1;
     padding: 8px;
     border: 1px solid #ccc;

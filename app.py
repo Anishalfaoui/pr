@@ -5,7 +5,7 @@ import threading
 import time
 import sys
 import json
-import ipaddress
+import subprocess
 from flask import Flask, request, jsonify, render_template
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
@@ -33,8 +33,8 @@ dest_info = {
     'port': None
 }
 
-# Store discovered peers
-discovered_peers = {}
+# Store discovered IPs
+discovered_ips = {}
 # Store local nickname
 local_nickname = "Anonymous"
 
@@ -74,8 +74,6 @@ def dechiffrer(data):
 
 def udp_listener():
     """Thread function to monitor UDP socket using epoll"""
-    local_ip, _ = get_network_info()
-    
     while True:
         try:
             events = epoll.poll(timeout=1)  # Use timeout to avoid blocking indefinitely
@@ -88,43 +86,12 @@ def udp_listener():
                         # Try to parse as JSON
                         try:
                             message_data = json.loads(message)
-                            
-                            # Check if it's a discovery message
-                            if message_data.get('type') == 'discovery':
-                                # Skip our own discovery messages
-                                if addr[0] == local_ip and message_data.get('port') == local_port:
-                                    continue
-                                    
-                                peer_id = f"{addr[0]}:{message_data.get('port')}"
-                                discovered_peers[peer_id] = {
-                                    'ip': addr[0],
-                                    'port': message_data.get('port'),
-                                    'nickname': message_data.get('nickname', 'Anonymous'),
-                                    'last_seen': time.time()
-                                }
-                                print(f"Discovered peer: {peer_id} ({message_data.get('nickname', 'Anonymous')})")
-                                
-                                # Send back a discovery response to ensure two-way discovery
-                                discovery_response = {
-                                    'type': 'discovery',
-                                    'port': local_port,
-                                    'nickname': local_nickname,
-                                    'timestamp': time.time()
-                                }
-                                response_json = json.dumps(discovery_response)
-                                encrypted_response = chiffrer(response_json)
-                                udp_socket.sendto(encrypted_response, (addr[0], int(message_data.get('port'))))
-                                
-                                # Emit update to clients
-                                socketio.emit('peers_updated', {'peers': discovered_peers})
-                            else:
-                                # Normal chat message
-                                content = message_data.get('content', message)  # Fallback to using the entire message
-                                socketio.emit('receive_message', {
-                                    'sender': f"{addr[0]}:{addr[1]}",
-                                    'message': content,
-                                    'timestamp': time.time()
-                                })
+                            content = message_data.get('content', message)  # Fallback to using the entire message
+                            socketio.emit('receive_message', {
+                                'sender': f"{addr[0]}:{addr[1]}",
+                                'message': content,
+                                'timestamp': time.time()
+                            })
                         except json.JSONDecodeError:
                             # Not JSON, treat as plain message
                             socketio.emit('receive_message', {
@@ -139,66 +106,70 @@ def udp_listener():
             print(f"Error in UDP listener: {e}")
             time.sleep(1)  # Avoid CPU spinning on persistent errors
 
+def ping_host(ip):
+    """Ping an IP address to check if it's online"""
+    try:
+        # Different ping command based on OS
+        if sys.platform.lower() == "win32":
+            ping_cmd = ["ping", "-n", "1", "-w", "100", ip]
+        else:
+            ping_cmd = ["ping", "-c", "1", "-W", "1", ip]
+            
+        # Run the command and suppress output
+        result = subprocess.run(ping_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return result.returncode == 0
+    except:
+        return False
+
 def scan_network():
-    """Thread function to scan the network and send discovery messages"""
-    global local_nickname, discovered_peers
+    """Thread function to scan the network for active IPs"""
+    global discovered_ips
     
     # Get network information
     local_ip, subnet_prefix = get_network_info()
     print(f"Local IP: {local_ip}, Subnet: {subnet_prefix}")
     
-    # Common UDP ports to try
-    common_ports = [local_port]  # Start with our own port
-    
-    # Add some common ports
-    for port in [1024, 5000, 8000, 12345, 50000]:
-        if port != local_port and port not in common_ports:
-            common_ports.append(port)
-    
     while True:
-        # Prepare discovery message
-        discovery_data = {
-            'type': 'discovery',
-            'port': local_port,
-            'nickname': local_nickname,
-            'timestamp': time.time()
+        active_ips = {}
+        
+        # Add our own IP first
+        active_ips[local_ip] = {
+            'hostname': 'This device',
+            'last_seen': time.time()
         }
         
-        discovery_json = json.dumps(discovery_data)
-        encrypted_discovery = chiffrer(discovery_json)
-        
-        # First, scan the network by sending to all IPs in the subnet
+        # Scan the network using ping
+        print(f"Starting network scan on {subnet_prefix}.0/24...")
         for i in range(1, 255):
             target_ip = f"{subnet_prefix}.{i}"
             
-            # Skip our own IP
+            # Skip our own IP (already added)
             if target_ip == local_ip:
                 continue
                 
-            for port in common_ports:
+            if ping_host(target_ip):
                 try:
-                    udp_socket.sendto(encrypted_discovery, (target_ip, port))
-                except Exception as e:
-                    pass  # Silently ignore errors when scanning
+                    # Try to get hostname (with timeout)
+                    hostname = socket.getfqdn(target_ip)
+                    if hostname == target_ip:  # If hostname is the same as IP
+                        hostname = "Unknown"
+                except:
+                    hostname = "Unknown"
+                
+                active_ips[target_ip] = {
+                    'hostname': hostname,
+                    'last_seen': time.time()
+                }
+                print(f"Found active host: {target_ip} ({hostname})")
         
-        print(f"Network scan completed, {len(discovered_peers)} peers found")
+        # Update discovered IPs
+        discovered_ips = active_ips
+        socketio.emit('ips_updated', {'ips': discovered_ips})
         
-        # Clean up old peers (not seen in the last 30 seconds)
-        current_time = time.time()
-        peers_to_remove = []
+        print(f"Network scan completed, {len(discovered_ips)} hosts found")
         
-        for peer_id, peer_info in discovered_peers.items():
-            if current_time - peer_info['last_seen'] > 30:
-                peers_to_remove.append(peer_id)
-        
-        if peers_to_remove:
-            for peer_id in peers_to_remove:
-                del discovered_peers[peer_id]
-                print(f"Removed inactive peer: {peer_id}")
-            socketio.emit('peers_updated', {'peers': discovered_peers})
-        
-        # Sleep before next scan - longer interval since we're scanning the whole network
-        time.sleep(10)  # Scan every 10 seconds
+        # Sleep before next scan
+        time.sleep(15)  # Scan every 15 seconds
 
 # Start the UDP listener thread
 udp_thread = threading.Thread(target=udp_listener, daemon=True)
@@ -221,11 +192,11 @@ def get_config():
         'dest_port': dest_info['port']
     })
 
-@app.route('/peers', methods=['GET'])
-def get_peers():
-    """Get the list of discovered peers"""
+@app.route('/active_ips', methods=['GET'])
+def get_active_ips():
+    """Get the list of discovered active IPs"""
     return jsonify({
-        'peers': discovered_peers
+        'ips': discovered_ips
     })
 
 @app.route('/connect', methods=['POST'])
@@ -247,8 +218,8 @@ def set_nickname():
 @socketio.on('connect')
 def handle_connect():
     emit('connection_status', {'status': 'connected', 'local_port': local_port})
-    # Send current peers list to newly connected client
-    emit('peers_updated', {'peers': discovered_peers})
+    # Send current discovered IPs to newly connected client
+    emit('ips_updated', {'ips': discovered_ips})
 
 @socketio.on('send_message')
 def handle_message(data):

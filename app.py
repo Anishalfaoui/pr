@@ -144,7 +144,7 @@ def scan_network():
         
         # Scan the network using ping
         print(f"Starting network scan on {subnet_prefix}.0/24...")
-        for i in range(1, 255):
+        for i in range(100, 106):
             target_ip = f"{subnet_prefix}.{i}"
             
             # Skip our own IP (already added)
